@@ -3,6 +3,15 @@ import { app } from "../src/application/web.js";
 import { prismaClient } from "../src/application/database.js";
 import { logger } from "../src/application/log.js";
 import bcrypt from "bcrypt";
+
+async function getTestUser() {
+  return prismaClient.user.findUnique({
+    where: {
+      username: "ftthreign",
+    },
+  });
+}
+
 /**
  * test for Register User API
  */
@@ -247,14 +256,6 @@ describe("PATCH /api/users/current", () => {
     expect(result.body.data.username).toBe("ftthreign");
     expect(result.body.data.name).toBe("Fadhil");
 
-    async function getTestUser() {
-      return prismaClient.user.findUnique({
-        where: {
-          username: "ftthreign",
-        },
-      });
-    }
-
     const user = await getTestUser();
 
     logger.info(result.body);
@@ -295,6 +296,48 @@ describe("PATCH /api/users/current", () => {
       .send({
         password: "",
       });
+
+    expect(result.status).toBe(401);
+  });
+});
+
+describe("DELETE /api/users/logout", () => {
+  beforeEach(async () => {
+    await prismaClient.user.create({
+      data: {
+        username: "ftthreign",
+        password: await bcrypt.hash("hash123", 10),
+        name: "Ftthreign123",
+        token: "test",
+      },
+    });
+  });
+
+  afterEach(async () => {
+    await prismaClient.user.deleteMany({
+      where: {
+        username: "ftthreign",
+      },
+    });
+  });
+
+  it("should can logout", async () => {
+    const result = await supertest(app)
+      .delete("/api/users/logout")
+      .set("Authorization", "test");
+
+    expect(result.status).toBe(200);
+    expect(result.body.data).toBe("OK");
+
+    const user = await getTestUser();
+
+    expect(user.token).toBeNull();
+  });
+
+  it("should reject logout if token is invalid", async () => {
+    const result = await supertest(app)
+      .delete("/api/users/logout")
+      .set("Authorization", "salah");
 
     expect(result.status).toBe(401);
   });
