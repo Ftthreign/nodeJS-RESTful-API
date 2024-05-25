@@ -2,7 +2,7 @@ import supertest from "supertest";
 import { app } from "../src/application/web.js";
 import { prismaClient } from "../src/application/database.js";
 import { logger } from "../src/application/log.js";
-
+import bcrypt from "bcrypt";
 /**
  * test for Register User API
  */
@@ -109,8 +109,9 @@ describe("POST /api/users/login", () => {
     await prismaClient.user.create({
       data: {
         username: "ftthreign",
-        password: "hash123",
+        password: await bcrypt.hash("hash123", 10),
         name: "Ftthreign123",
+        token: "test",
       },
     });
   });
@@ -121,5 +122,94 @@ describe("POST /api/users/login", () => {
         username: "ftthreign",
       },
     });
+  });
+
+  it("should can login", async () => {
+    const result = await supertest(app).post("/api/users/login").send({
+      username: "ftthreign",
+      password: "hash123",
+    });
+
+    logger.info(result.body);
+
+    expect(result.status).toBe(200);
+    expect(result.body.data.token).toBeDefined();
+    expect(result.body.data.token).not.toBe("test");
+  });
+
+  it("should reject login if req is invalid", async () => {
+    const result = await supertest(app).post("/api/users/login").send({
+      username: "",
+      password: "",
+    });
+
+    logger.info(result.body);
+
+    expect(result.status).toBe(400);
+    expect(result.body.errors).toBeDefined();
+  });
+
+  it("should reject login if password is wrong", async () => {
+    const result = await supertest(app).post("/api/users/login").send({
+      username: "ftthreign",
+      password: "wrong",
+    });
+
+    logger.info(result.body);
+
+    expect(result.status).toBe(401);
+    expect(result.body.errors).toBeDefined();
+  });
+
+  it("should reject login if username is wrong", async () => {
+    const result = await supertest(app).post("/api/users/login").send({
+      username: "wrongusername",
+      password: "wrongpassword",
+    });
+
+    logger.info(result.body);
+
+    expect(result.status).toBe(401);
+    expect(result.body.errors).toBeDefined();
+  });
+});
+
+describe("GET /api/users/current", () => {
+  beforeEach(async () => {
+    await prismaClient.user.create({
+      data: {
+        username: "ftthreign",
+        password: await bcrypt.hash("hash123", 10),
+        name: "Ftthreign123",
+        token: "test",
+      },
+    });
+  });
+
+  afterEach(async () => {
+    await prismaClient.user.deleteMany({
+      where: {
+        username: "ftthreign",
+      },
+    });
+  });
+
+  it("should get current user", async () => {
+    const result = await supertest(app)
+      .get("/api/users/current")
+      .set("Authorization", "test");
+
+    expect(result.status).toBe(200);
+    expect(result.body.data.username).toBe("ftthreign");
+    expect(result.body.data.name).toBe("Ftthreign123");
+  });
+
+  it("should reject if token is invalid", async () => {
+    const result = await supertest(app)
+      .get("/api/users/current")
+      .set("Authorization", "tokensalah");
+
+    expect(result.status).toBe(401);
+    expect(result.body.errors).toBeDefined();
   });
 });
