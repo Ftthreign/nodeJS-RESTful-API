@@ -213,3 +213,89 @@ describe("GET /api/users/current", () => {
     expect(result.body.errors).toBeDefined();
   });
 });
+
+describe("PATCH /api/users/current", () => {
+  beforeEach(async () => {
+    await prismaClient.user.create({
+      data: {
+        username: "ftthreign",
+        password: await bcrypt.hash("hash123", 10),
+        name: "Ftthreign123",
+        token: "test",
+      },
+    });
+  });
+
+  afterEach(async () => {
+    await prismaClient.user.deleteMany({
+      where: {
+        username: "ftthreign",
+      },
+    });
+  });
+
+  it("should can update user", async () => {
+    const result = await supertest(app)
+      .patch("/api/users/current")
+      .set("Authorization", "test")
+      .send({
+        name: "Fadhil",
+        password: "Rahasialagi",
+      });
+
+    expect(result.status).toBe(200);
+    expect(result.body.data.username).toBe("ftthreign");
+    expect(result.body.data.name).toBe("Fadhil");
+
+    async function getTestUser() {
+      return prismaClient.user.findUnique({
+        where: {
+          username: "ftthreign",
+        },
+      });
+    }
+
+    const user = await getTestUser();
+
+    logger.info(result.body);
+
+    expect(await bcrypt.compare("Rahasialagi", user.password)).toBe(true);
+  });
+
+  it("should can update user name", async () => {
+    const result = await supertest(app)
+      .patch("/api/users/current")
+      .set("Authorization", "test")
+      .send({
+        name: "Fadhil",
+      });
+
+    expect(result.status).toBe(200);
+    expect(result.body.data.username).toBe("ftthreign");
+    expect(result.body.data.name).toBe("Fadhil");
+  });
+
+  it("should can update user password", async () => {
+    const result = await supertest(app)
+      .patch("/api/users/current")
+      .set("Authorization", "test")
+      .send({
+        password: "Rahasialagi",
+      });
+
+    expect(result.status).toBe(200);
+    expect(result.body.data.username).toBe("ftthreign");
+    expect(result.body.data.name).toBe("Ftthreign123");
+  });
+
+  it("should reject if request is not valid", async () => {
+    const result = await supertest(app)
+      .patch("/api/users/current")
+      .set("Authorization", "salah")
+      .send({
+        password: "",
+      });
+
+    expect(result.status).toBe(401);
+  });
+});
