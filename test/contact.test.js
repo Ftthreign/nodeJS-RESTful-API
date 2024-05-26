@@ -11,6 +11,20 @@ const getTestContact = async () => {
   });
 };
 
+const createManyTestContacts = async () => {
+  for (let i = 0; i < 15; i++) {
+    await prismaClient.contact.create({
+      data: {
+        username: `ftthreign`,
+        first_name: `test ${i}`,
+        last_name: `test ${i}`,
+        email: `test${i}@gamil.co`,
+        phone: `340343${i}`,
+      },
+    });
+  }
+};
+
 describe("POST /api/contacts", () => {
   beforeEach(async () => {
     await prismaClient.user.create({
@@ -271,5 +285,104 @@ describe("DELETE /api/contacts/:contactId", () => {
       .set("Authorization", "test");
 
     expect(result.status).toBe(404);
+  });
+});
+
+describe("GET /api/contacts", () => {
+  beforeEach(async () => {
+    await prismaClient.user.create({
+      data: {
+        username: "ftthreign",
+        password: await bcrypt.hash("hash123", 10),
+        name: "Ftthreign123",
+        token: "test",
+      },
+    });
+    await createManyTestContacts();
+  });
+
+  afterEach(async () => {
+    await prismaClient.contact.deleteMany({
+      where: {
+        username: "ftthreign",
+      },
+    });
+    await prismaClient.user.deleteMany({
+      where: {
+        username: "ftthreign",
+      },
+    });
+  });
+
+  it("should can search without parameter", async () => {
+    const result = await supertest(app)
+      .get("/api/contacts")
+      .set("Authorization", "test");
+
+    expect(result.status).toBe(200);
+    expect(result.body.data.length).toBe(10);
+    expect(result.body.paging.page).toBe(1);
+    expect(result.body.paging.total_page).toBe(2);
+    expect(result.body.paging.total_item).toBe(15);
+  });
+
+  it("should can search to page 2", async () => {
+    const result = await supertest(app)
+      .get("/api/contacts")
+      .query({
+        page: 2,
+      })
+      .set("Authorization", "test");
+
+    expect(result.status).toBe(200);
+    expect(result.body.data.length).toBe(5);
+    expect(result.body.paging.page).toBe(2);
+    expect(result.body.paging.total_page).toBe(2);
+    expect(result.body.paging.total_item).toBe(15);
+  });
+
+  it("should can search using name", async () => {
+    const result = await supertest(app)
+      .get("/api/contacts")
+      .query({
+        name: "test 1",
+      })
+      .set("Authorization", "test");
+
+    expect(result.status).toBe(200);
+    expect(result.body.data.length).toBe(6);
+    expect(result.body.paging.page).toBe(1);
+    expect(result.body.paging.total_page).toBe(1);
+    expect(result.body.paging.total_item).toBe(6);
+  });
+
+  it("should can search using email", async () => {
+    const result = await supertest(app)
+      .get("/api/contacts")
+      .query({
+        email: "test1",
+      })
+      .set("Authorization", "test");
+
+    expect(result.status).toBe(200);
+    expect(result.body.data.length).toBe(6);
+    expect(result.body.paging.page).toBe(1);
+    expect(result.body.paging.total_page).toBe(1);
+    expect(result.body.paging.total_item).toBe(6);
+  });
+
+  it("should can search using email", async () => {
+    const result = await supertest(app)
+      .get("/api/contacts")
+      .query({
+        phone: "3403431",
+      })
+      .set("Authorization", "test");
+
+    expect(result.status).toBe(200);
+    expect(result.body.data.length).toBe(6);
+    expect(result.body.paging.page).toBe(1);
+    expect(result.body.paging.total_page).toBe(1);
+    expect(result.body.paging.total_item).toBe(6);
   });
 });
